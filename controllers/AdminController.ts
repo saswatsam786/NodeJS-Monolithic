@@ -3,10 +3,18 @@ import { CreateVandorInput } from "../dto";
 import { Vandor } from "../models";
 import { GenerateSalt, GeneratePassword } from "../utility";
 
-export const CreateVandor = async (req: Request, res: Response, next: NextFunction) => {
-  const { name, ownerName, foodType, pincode, address, phone, email, password } = <CreateVandorInput>req.body;
+export const FindVandor = async (id: string | undefined, email?: string) => {
+  if (email) {
+    return await Vandor.findOne({ email: email });
+  } else {
+    return await Vandor.findById(id);
+  }
+};
 
-  const existingVandor = await Vandor.findOne({ email: email });
+export const CreateVandor = async (req: Request, res: Response, next: NextFunction) => {
+  const { name, ownerName, foodTypes, pincode, address, phone, email, password } = <CreateVandorInput>req.body;
+
+  const existingVandor = await FindVandor("", email);
 
   if (existingVandor) return res.json({ message: "Vandor already exist with this email ID" });
 
@@ -14,13 +22,11 @@ export const CreateVandor = async (req: Request, res: Response, next: NextFuncti
   const salt = await GenerateSalt();
   const userPassword = await GeneratePassword(password, salt);
 
-  // Encrypt the password using the salt
-
   const createVandor = await Vandor.create({
     name: name,
     address: address,
     pincode: pincode,
-    foodType: foodType,
+    foodTypes: foodTypes,
     email: email,
     password: userPassword,
     salt: salt,
@@ -34,6 +40,20 @@ export const CreateVandor = async (req: Request, res: Response, next: NextFuncti
   return res.json(createVandor);
 };
 
-export const GetVandors = async (req: Request, res: Response, next: NextFunction) => {};
+export const GetVandors = async (req: Request, res: Response, next: NextFunction) => {
+  const vandors = await Vandor.find();
 
-export const GetVandorByID = async (req: Request, res: Response, next: NextFunction) => {};
+  if (vandors !== null) return res.json(vandors);
+
+  return res.json({ message: "Vandors data not available" });
+};
+
+export const GetVandorByID = async (req: Request, res: Response, next: NextFunction) => {
+  const vandorId = req.params.id;
+
+  const vandor = await FindVandor(vandorId);
+
+  if (vandor !== null) return res.json(vandor);
+
+  return res.json({ message: "Vandor data not available" });
+};

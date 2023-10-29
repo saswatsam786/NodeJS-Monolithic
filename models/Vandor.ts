@@ -3,14 +3,14 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 interface VandorDoc extends Document {
   name: string;
   ownerName: string;
-  foodType: [string];
+  foodTypes: [string];
   pincode: string;
   address: string;
   phone: string;
   email: string;
   password: string;
   salt: string;
-  serviceAvailable: string;
+  serviceAvailable: boolean;
   coverImages: [string];
   rating: string;
   //   foods: any;
@@ -20,7 +20,7 @@ const VandorSchema = new Schema(
   {
     name: { type: String, required: true },
     ownerName: { type: String, required: true },
-    foodType: { type: [String] },
+    foodTypes: { type: [String] },
     pincode: { type: String, required: true },
     address: { type: String },
     phone: { type: String, required: true },
