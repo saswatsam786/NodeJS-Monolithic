@@ -1,10 +1,11 @@
 import { Request, Response, NextFunction } from "express";
-import { EditVandorInputs, VandorLoginInput } from "../dto";
+import { CreateOfferInputs, EditVandorInputs, VandorLoginInput } from "../dto";
 import { FindVandor } from "./AdminController";
 import { GenerateSignature, ValidatePassword } from "../utility";
 import { CreateFoodInputs } from "../dto/Food.dto";
 import { Food } from "../models/Food";
 import { Order } from "../models/Order";
+import { Offer } from "../models";
 
 export const VandorLogin = async (req: Request, res: Response, next: NextFunction) => {
   const { email, password } = <VandorLoginInput>req.body;
@@ -88,13 +89,20 @@ export const UpdateVandorCoverImage = async (req: Request, res: Response, next: 
 };
 
 export const UpdateVandorService = async (req: Request, res: Response, next: NextFunction) => {
-  const { foodTypes, name, address, phone } = <EditVandorInputs>req.body;
   const user = req.user;
+
+  const { lat, lng } = req.body;
   if (user) {
     const existingVandor = await FindVandor(user._id);
 
     if (existingVandor !== null) {
       existingVandor.serviceAvailable = !existingVandor.serviceAvailable;
+
+      if (lat && lng) {
+        existingVandor.lat = lat;
+        existingVandor.lng = lng;
+      }
+
       const savedResult = await existingVandor.save();
       return res.json(savedResult);
     }
@@ -200,4 +208,135 @@ export const ProcessOrder = async (req: Request, res: Response, next: NextFuncti
   }
 
   return res.json({ message: "Unable to process order" });
+};
+
+export const GetOffers = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+
+  if (user) {
+    let currentOffers = Array();
+    const offers = await Offer.find().populate("vandors");
+
+    if (offers) {
+      offers.map((item) => {
+        if (item.vandors) {
+          item.vandors.map((vandor) => {
+            if (vandor._id == user._id) {
+              currentOffers.push(item);
+            }
+          });
+        }
+
+        if (item.offerType === "GENERIC") {
+          currentOffers.push(item);
+        }
+      });
+    }
+
+    return res.status(200).json(currentOffers);
+  }
+
+  return res.json({ message: "Unable to Get Offers" });
+};
+
+export const AddOffer = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+
+  if (user) {
+    const {
+      title,
+      description,
+      offerType,
+      offerAmount,
+      pincode,
+      promocode,
+      promoType,
+      startValidity,
+      endValidity,
+      bank,
+      bins,
+      minValue,
+      isActive,
+    } = <CreateOfferInputs>req.body;
+
+    const vandor = await FindVandor(user._id);
+
+    if (vandor) {
+      const offer = await Offer.create({
+        title,
+        description,
+        offerType,
+        offerAmount,
+        pincode,
+        promocode,
+        promoType,
+        startValidity,
+        endValidity,
+        bank,
+        bins,
+        isActive,
+        minValue,
+        vandors: [vandor],
+      });
+
+      console.log(offer);
+
+      return res.status(200).json(offer);
+    }
+  }
+
+  return res.json({ message: "Unable to Add Offer" });
+};
+
+export const EditOffer = async (req: Request, res: Response, next: NextFunction) => {
+  const user = req.user;
+
+  const offerId = req.params.id;
+
+  if (user) {
+    const {
+      title,
+      description,
+      offerType,
+      offerAmount,
+      pincode,
+      promocode,
+      promoType,
+      startValidity,
+      endValidity,
+      bank,
+      bins,
+      minValue,
+      isActive,
+    } = <CreateOfferInputs>req.body;
+
+    const currentOffer = await Offer.findById(offerId);
+
+    if (currentOffer) {
+      const vandor = await FindVandor(user._id);
+
+      if (vandor) {
+        currentOffer.title = title;
+        currentOffer.description = description;
+        currentOffer.offerType = offerType;
+        currentOffer.offerAmount = offerAmount;
+        currentOffer.pincode = pincode;
+        currentOffer.promocode = promocode;
+        currentOffer.promoType = promoType;
+        currentOffer.startValidity = startValidity;
+        currentOffer.endValidity = endValidity;
+        currentOffer.bank = bank;
+        currentOffer.bins = bins;
+        currentOffer.minValue = minValue;
+        currentOffer.isActive = isActive;
+        currentOffer.vandors = [vandor];
+
+        const result = await currentOffer.save();
+
+        return res.status(200).json(result);
+      }
+    }
+  }
+
+  return res.json({ message: "Unable to Add Offer" });
 };

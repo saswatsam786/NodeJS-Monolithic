@@ -1,7 +1,7 @@
 import express, { Request, Response, NextFunction } from "express";
 import { validate } from "class-validator";
 import { plainToClass } from "class-transformer";
-import { CreateCustomerInputs, EditCustomerProfileInputs, OrderInputs, UserLoginInputs } from "../dto/Customer.dto";
+import { CartItem, CreateCustomerInputs, EditCustomerProfileInputs, OrderInputs, UserLoginInputs } from "../dto";
 import {
   GenerateOTP,
   GeneratePassword,
@@ -13,6 +13,7 @@ import {
 import { Customer } from "../models/Customer";
 import { Food } from "../models/Food";
 import { Order } from "../models/Order";
+import { DeliveryUser, Offer, Transaction, Vandor } from "../models";
 
 export const CustomerSignUp = async (req: Request, res: Response, next: NextFunction) => {
   const customerInputs = plainToClass(CreateCustomerInputs, req.body);
@@ -209,7 +210,7 @@ export const AddToCart = async (req: Request, res: Response, next: NextFunction)
     const profile = await Customer.findById(customer._id).populate("cart.food");
     let cartItems = Array();
 
-    const { _id, unit } = <OrderInputs>req.body;
+    const { _id, unit } = <CartItem>req.body;
 
     const food = await Food.findById(_id);
 
@@ -278,35 +279,94 @@ export const DeleteCart = async (req: Request, res: Response, next: NextFunction
   return res.status(400).json({ message: "Cart is already empty" });
 };
 
+// --------------------- Delivery Notifications ----------------------------------------------------------------
+
+const assignOrderForDelivery = async (orderId: string, vandorId: string) => {
+  // find the vandor
+  const vandor = await Vandor.findById(vandorId);
+
+  if (vandor) {
+    const areaCode = vandor.pincode;
+    const vandorLat = vandor.lat;
+    const vandorLng = vandor.lng;
+    // find the available of delivery person
+
+    const deliveryPerson = await DeliveryUser.find({ pincode: areaCode, verified: true, isAvailable: true });
+
+    if (deliveryPerson) {
+      // Check the nearet delivery person and assign the order
+      console.log(`Delivery Person ${deliveryPerson[0]}`);
+
+      const currentOrder = await Order.findById(orderId);
+
+      if (currentOrder) {
+        // update deliveryId
+        currentOrder.deliveryId = deliveryPerson[0]._id;
+        const response = await currentOrder.save();
+
+        console.log(response);
+
+        // Notify to Vandor for received New Order using firebase push notification
+      }
+    } else {
+      console.log("Delivery Person not available");
+    }
+  }
+
+  // update deliveryID
+};
+
+// Order Section ----------------------------------------------
+
+const validTransaction = async (txnId: string) => {
+  const currentTransaction = await Transaction.findById(txnId);
+
+  if (currentTransaction) {
+    if (currentTransaction.status.toLowerCase() !== "failed") {
+      return { status: true, currentTransaction };
+    }
+  }
+
+  return { status: false, currentTransaction };
+};
+
 export const CreateOrder = async (req: Request, res: Response, next: NextFunction) => {
   // Grab current login customer
   const customer = req.user;
 
+  const { txnId, amount, items } = <OrderInputs>req.body;
+
   if (customer) {
+    // validate transaction
+    const { status, currentTransaction } = await validTransaction(txnId);
+
+    if (!status) {
+      return res.status(400).json({ message: "Error with Create Order" });
+    }
+
     // Create an Order ID
     const orderId = `${Math.floor(Math.random() * 89999) + 1000}`;
 
     const profile = await Customer.findById(customer._id);
 
     // Grab order items from request [{id: string, quantity: number}}]
-    const cart = <[OrderInputs]>req.body;
 
     let cartItems = Array();
 
     let netAmount = 0.0;
 
-    let vendorId;
+    let vandorId;
 
     // Calculate order amount
     const foods = await Food.find()
       .where("_id")
-      .in(cart.map((item) => item._id))
+      .in(items.map((item) => item._id))
       .exec();
 
     foods.map((food) => {
-      cart.map(({ _id, unit }) => {
+      items.map(({ _id, unit }) => {
         if (food._id == _id) {
-          vendorId = food.vandorId;
+          vandorId = food.vandorId;
           netAmount += food.price * unit;
           cartItems.push({ food, unit });
         }
@@ -318,28 +378,33 @@ export const CreateOrder = async (req: Request, res: Response, next: NextFunctio
       // Create order
       const currentOrder = await Order.create({
         orderID: orderId,
-        vendorId: vendorId,
+        vendorId: vandorId,
         items: cartItems,
         totalAmount: netAmount,
+        paidAmount: amount,
         orderDate: new Date(),
-        paidThrough: "COD",
-        paymentResponse: "",
         orderStatus: "Waiting",
         remarks: "",
         deliveryId: "",
-        appliedOffers: false,
-        offerId: null,
         readyTime: 45,
       });
 
       // Finally update orders to user account
-      if (currentOrder) {
-        profile.cart = [] as any;
-        profile.orders.push(currentOrder);
-        const profileSaveResponse = await profile.save();
 
-        return res.status(200).json(profileSaveResponse);
-      }
+      profile.cart = [] as any;
+      profile.orders.push(currentOrder);
+
+      currentTransaction.vandorId = vandorId;
+      currentTransaction.orderId = orderId;
+      currentTransaction.status = "CONFIRMED";
+
+      await currentTransaction.save();
+
+      assignOrderForDelivery(currentOrder._id, vandorId);
+
+      const profileSaveResponse = await profile.save();
+
+      return res.status(200).json(currentOrder);
     }
   }
 
@@ -370,4 +435,62 @@ export const GetOrderById = async (req: Request, res: Response, next: NextFuncti
   }
 
   return res.status(400).json({ message: "Error with fetching order" });
+};
+
+export const VerifyOffer = async (req: Request, res: Response, next: NextFunction) => {
+  const offerId = req.params.id;
+  const customer = req.user;
+
+  if (customer) {
+    const appliedOffer = await Offer.findById(offerId);
+    if (appliedOffer) {
+      if (appliedOffer.promoType === "USER") {
+        // Only can apply once per user
+      } else {
+        if (appliedOffer.isActive) {
+          return res.status(200).json({ message: "Offer is Valid", offer: appliedOffer });
+        }
+      }
+    }
+  }
+
+  return res.status(400).json({ message: "Offer is not valid" });
+};
+
+export const CreatePayment = async (req: Request, res: Response, next: NextFunction) => {
+  const customer = req.user;
+
+  const { amount, paymentMode, offerId } = req.body;
+
+  let payableAmount = Number(amount);
+
+  if (offerId) {
+    const appliedOffer = await Offer.findById(offerId);
+
+    if (appliedOffer) {
+      if (appliedOffer.isActive) {
+        payableAmount = payableAmount - appliedOffer.offerAmount;
+      }
+    }
+  }
+
+  // Perform Payment Gateway API Call
+
+  // right after payment gateway succcess/ failure
+
+  // Create record on Transaction
+  const transaction = await Transaction.create({
+    customer: customer._id,
+    vandorId: "",
+    orderId: "",
+    orderValue: payableAmount,
+    offerUsed: offerId || "NA",
+    status: "OPEN",
+    paymentMode: paymentMode,
+    paymentResponse: "Payment in Cash on Delivery",
+  });
+
+  // return the transaction id
+
+  return res.status(200).json(transaction);
 };

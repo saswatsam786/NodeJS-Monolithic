@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { CreateVandorInput } from "../dto";
-import { Vandor } from "../models";
+import { DeliveryUser, Transaction, Vandor } from "../models";
 import { GenerateSalt, GeneratePassword } from "../utility";
 
 export const FindVandor = async (id: string | undefined, email?: string) => {
@@ -36,6 +36,8 @@ export const CreateVandor = async (req: Request, res: Response, next: NextFuncti
     serviceAvailable: false,
     coverImages: [],
     foods: [],
+    lat: 0,
+    lng: 0,
   });
 
   return res.json(createVandor);
@@ -57,4 +59,55 @@ export const GetVandorByID = async (req: Request, res: Response, next: NextFunct
   if (vandor !== null) return res.json(vandor);
 
   return res.json({ message: "Vandor data not available" });
+};
+
+export const GetTransactions = async (req: Request, res: Response, next: NextFunction) => {
+  const transactions = await Transaction.find();
+
+  if (transactions) {
+    return res.status(200).json(transactions);
+  }
+
+  return res.json({ message: "Transactions not available" });
+};
+
+export const GetTransactionById = async (req: Request, res: Response, next: NextFunction) => {
+  const id = req.params.id;
+
+  const transaction = await Transaction.findById(id);
+
+  if (transaction) {
+    return res.status(200).json(transaction);
+  }
+
+  return res.json({ message: "Transaction not available" });
+};
+
+export const VerifyDeliveryUser = async (req: Request, res: Response, next: NextFunction) => {
+  const { _id, status } = req.body;
+
+  if (_id) {
+    const profile = await DeliveryUser.findById(_id);
+
+    if (profile) {
+      profile.verified = status;
+      profile.pincode = "400050";
+
+      const result = await profile.save();
+
+      return res.status(200).json(result);
+    }
+  }
+
+  return res.status(400).json({ message: "Unable to verify delivery user" });
+};
+
+export const GetDeliveryUsers = async (req: Request, res: Response, next: NextFunction) => {
+  const deliveryUsers = await DeliveryUser.find();
+
+  if (deliveryUsers) {
+    return res.status(200).json(deliveryUsers);
+  }
+
+  return res.status(400).json({ message: "Unable to get delivery users" });
 };

@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction } from "express";
 import {
   AddToCart,
   CreateOrder,
+  CreatePayment,
   CustomerLogin,
   CustomerSignUp,
   CustomerVerify,
@@ -12,6 +13,7 @@ import {
   GetOrderById,
   GetOrders,
   RequestOtp,
+  VerifyOffer,
 } from "../controllers";
 import { Authenticate } from "../middlewares";
 
@@ -41,6 +43,12 @@ router.patch("/profile", EditCustomerProfile);
 router.post("/cart", AddToCart);
 router.get("/cart", GetCart);
 router.delete("/cart", DeleteCart);
+
+// --------------------- Applu Offers -------------------------------
+router.get("/offer/verify/:id", VerifyOffer);
+
+// -------- Payment ----------------
+router.post("/create-payment", CreatePayment);
 
 // Order
 router.post("/create-order", CreateOrder);
