@@ -124,6 +124,10 @@ To interact with the Food Ordering Backend Application, you can use the provided
 
 - **Find Restaurant by ID**: Users can view details of a specific restaurant.
 
+## Food API Postman Routes
+
+[<strong>FOOD API ROUTE</strong>](https://api.postman.com/collections/14197907-b27b0397-9872-4596-a8d6-ebc11b916a13?access_key=PMAT-01HEQZK7DA15FH9B93RYJN2CGJ)
+
 ## Contribution
 
 Contributions are welcome! If you'd like to contribute to the project, you can raise issue and start working.
