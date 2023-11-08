@@ -7,6 +7,7 @@ Welcome to the Food Ordering Backend Application! This application provides the 
 - [Installation](#installation)
 - [Usage](#usage)
 - [Functionalities](#functionalities)
+- [Food API Postman Routes](#food-api-postman-routes)
 - [Contribution](#contribution)
 
 ## Installation
@@ -116,7 +117,7 @@ To interact with the Food Ordering Backend Application, you can use the provided
 
 - **View Top Restaurants**: Users can find top-rated restaurants based on a location (pincode).
 
-- **View Food Available in 30 Minutes**: Users can find food items available within 30 minutes based on a location (pincode).
+- **View Food Available in 30 Minutes**: Users can find food items within 30 minutes based on a location (pincode).
 
 - **Search for Food**: Users can search for specific food items based on a location (pincode).
 
@@ -130,6 +131,6 @@ To interact with the Food Ordering Backend Application, you can use the provided
 
 ## Contribution
 
-Contributions are welcome! If you'd like to contribute to the project, you can raise issue and start working.
+Contributions are welcome! Please feel free to raise the issue and start working if you'd like to contribute to the project.
 
 **Happy Food Ordering! 🍔🍕🍣**
